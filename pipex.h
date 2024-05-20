@@ -6,20 +6,52 @@
 /*   By: martalop <martalop@student.42barcel>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/04/24 18:44:08 by martalop          #+#    #+#             */
-/*   Updated: 2024/04/25 21:33:29 by martalop         ###   ########.fr       */
+/*   Updated: 2024/05/17 16:03:52 by martalop         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef PIPEX_H
 # define PIPEX_H
 
-char	**split_add(char *str, char c);
+# include <fcntl.h>
+
+/*typedef struct s_main
+{
+	char	**env;
+	char	**argv;
+	int		argc;
+}	t_main*/
+
+typedef struct s_info
+{
+	int		pipe_end[2];
+	char	*in_name;
+	char	*out_name;
+	char	**paths;
+	char	**argv;
+	char	**env;
+	int		argc;
+}	t_info;
+
+typedef struct s_cmd
+{
+	char	**arr_cmd;
+	char	*path;
+//	int		pos;
+	struct	s_cmd	*second;
+}	t_cmd;
+
 char	**prep_cmd_paths(char **env);
-char	*find_command(char **paths, char **argv);
+char	*find_path(char **paths, char **arr_cmd);
 char	**get_cmds(char *arg);
 char	**free_array(char **array);
-int		execute_cmd(char *argv, char **env);
+int		exec_first_cmd(t_info *info, t_cmd *cmd_info, char **env);
+int		exec_scnd_cmd(t_info *info, t_cmd *cmd_info, char **env);
+t_cmd	*set_command(t_info *info, char *argv);
+void	free_t_cmd(t_cmd *cmd);
+int		set_info(char **argv, int argc, char **env, t_info *info);
+void	print_t_info(t_info info);
 
-long	start_time;
+//long	start_time;
 
 #endif
