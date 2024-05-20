@@ -29,7 +29,7 @@ char	**prep_cmd_paths(char **env)
 	i = 0;
 	while (env[i] && !ft_strnstr(env[i], "PATH", 4))
 		i++;
-	if (!env[i])
+	if (!env[i]) // para cuando no encuentra "PATH" en el env
 	{
 		paths = malloc(sizeof(char *) * 1);
 		if (!paths)
