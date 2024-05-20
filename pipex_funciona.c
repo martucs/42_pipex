@@ -27,7 +27,7 @@ char	**prep_cmd_paths(char **env)
 	paths = NULL;
 
 	i = 0;
-	while (env[i] && !ft_strnstr(env[i], "PATH", 4))
+	while (env[i] && !ft_strnstr(env[i], "PATH", 4)) // si no pongo "env[i]" tengo segfault prq entra a strnstr con una direccion de memoria nula
 		i++;
 	if (!env[i]) // para cuando no encuentra "PATH" en el env
 	{
