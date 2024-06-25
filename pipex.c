@@ -6,135 +6,136 @@
 /*   By: martalop <martalop@student.42barcel>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/04/21 18:01:09 by martalop          #+#    #+#             */
-/*   Updated: 2024/04/29 19:49:13 by martalop         ###   ########.fr       */
+/*   Updated: 2024/05/31 18:32:59 by martalop         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "libft/libft.h"
 #include "pipex.h"
-#include <stdio.h>
-#include <sys/time.h>
 
-long	gettime(void)
+int	exec_scnd_cmd(t_info *info, t_cmd *cmd_info)
 {
-	struct timeval	time;
+	int		fd2;
 
-	gettimeofday(&time, NULL);
-	time.tv_sec %= 31556925;
-	return (time.tv_sec * 1e6 + time.tv_usec);
-}
-
-char	**prep_cmd_paths(char **env)
-{
-	int	i;
-	int	x;
-	char	*tmp;
-	char	**paths;
-
-	i = 0;
-	x = 0;
-	paths = NULL;
-	while (!ft_strnstr(env[i], "PATH", 4))
-	{
-		i++;
-	}
-//	printf("\nline %d is: %s\n", i + 1, env[i]);
-	paths = ft_split(env[i] + 5, ':');
-	if (!paths)
-		return ( NULL);
-	while (paths[x])
-	{
-		tmp = ft_strjoin(paths[x], "/");
-		if (!tmp)
-			return (free_array(paths));
-		free(paths[x]);
-		paths[x] = tmp;
-		x++;
-	}
-	return (paths);
-}
-
-char	*find_path(char **paths, char **arr_cmd)
-{
-	int	x;
-	char	*tmp;
-
-	x = 0;
-	while (paths[x])
-	{
-		tmp = ft_strjoin(paths[x], arr_cmd[0]);
-		if (!tmp)
-			return (NULL);
-		if (!access(tmp, X_OK))
-		{
-//			printf("I have access to %s\n", tmp);
-			return (tmp);
-		}
-		else
-//			printf("I don't have access to %s\n", tmp);
-		free(tmp); // estoy borrando cada resultado del strjoin
-		x++;
-	}
-	return (NULL);
-}
-
-char	**get_cmds(char *arg)
-{
-	char	**array;
-
-	array = ft_split(arg, ' ');
-	if (!array)
-		return (NULL);
-	return (array);
-}
-
-int	execute_cmd(char *argv, char **env)
-{
-	int		i;
-	int		x;
-	int		pid;
-	char	**arr_cmd;
-	char	**paths;
-	char	*right_path;
-
-	i = 0;
-	x = 0;
-	paths = prep_cmd_paths(env); // hago split de todos los paths + el '/' y devuelvo char **
-	if (!paths)
-		return (perror("problem getting commands"), 1);
-	while (paths[x])
-	{
-		i++;
-		x++;
-	}
-	arr_cmd = get_cmds(argv); // split del segundo argumento (primer comando)
-	if (!arr_cmd)
-		return (perror("problem spliting argument"), 1);
-	right_path = find_path(paths, arr_cmd); // juntar el path con el comando base y comprobar acceso para cada path
-	if (!right_path)
+	info->pid2 = fork();
+	if (info->pid2 == -1)
 		return (1);
-	pid = fork();
-	if (pid == 0)
+	if (info->pid2 == 0)
 	{
-		execve(right_path, arr_cmd, env);
-		exit(0);
+		fd2 = open(info->out_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fd2 < 1)
+		{
+			write(2, info->out_name, ft_strlen(info->out_name));
+			perror_message("", 1);
+		}
+		if (dup2(fd2, 1) == -1)
+			perror_message("problem with dup2 of std_out in 2nd command", 0);
+		close(fd2);
+		if (dup2(info->pipe_end[0], 0) == -1)
+			perror_message("problem with dup2 of std_in in 2nd command", 0);
+		close(info->pipe_end[0]);
+		if (execve(cmd_info->path, cmd_info->arr_cmd, info->env) == -1)
+			cmd_not_found(cmd_info);
 	}
 	return (0);
+}
+
+int	exec_first_cmd(t_info *info, t_cmd *cmd_info)
+{
+	int		fd;
+
+	info->pid1 = fork();
+	if (info->pid1 == -1)
+		return (1);
+	if (info->pid1 == 0)
+	{
+		fd = open(info->in_name, O_RDONLY);
+		if (fd < 1)
+		{
+			write(2, info->in_name, ft_strlen(info->in_name));
+			perror_message("", 1);
+		}
+		if (dup2(fd, 0) == -1)
+			perror_message("problem with dup2 of std_in in 1st command", 0);
+		close(fd);
+		if (dup2(info->pipe_end[1], 1) == -1)
+			perror_message("problem with dup2 of std_out in 1st command", 0);
+		close(info->pipe_end[1]);
+		close(info->pipe_end[0]);
+		if (execve(cmd_info->path, cmd_info->arr_cmd, info->env) == -1)
+			cmd_not_found(cmd_info);
+	}
+	return (0);
+}
+
+int	second_cmd(t_info *info, t_cmd *cmd)
+{
+	cmd->second = set_command(info, info->argv[3]);
+	if (!cmd->second)
+	{
+		free_array(info->paths);
+		free_t_cmd(cmd);
+		perror("problem getting command 2 info");
+		return (1);
+	}
+	if (exec_scnd_cmd(info, cmd->second) == -1)
+	{
+		free_t_cmd(cmd->second);
+		free_t_cmd(cmd);
+		free_array(info->paths);
+		perror("fork problem in cmd2");
+		return (1);
+	}
+	close(info->pipe_end[0]);
+	return (0);
+}
+
+t_cmd	*first_cmd(t_info *info)
+{
+	t_cmd	*cmd_info1;
+
+	cmd_info1 = set_command(info, info->argv[2]);
+	if (!cmd_info1)
+	{
+		free_array(info->paths);
+		return (NULL);
+	}
+	if (exec_first_cmd(info, cmd_info1) == -1)
+	{
+		free_t_cmd(cmd_info1);
+		free_array(info->paths);
+		perror("fork problem in cmd1");
+		return (NULL);
+	}
+	close(info->pipe_end[1]);
+	return (cmd_info1);
 }
 
 int	main(int argc, char **argv, char **env)
 {
-	int	x;
-	
-	start_time = gettime();
-	x = 0;
-	if (argc < 5)
+	t_cmd	*cmd;
+	t_info	info;
+	int		exit_status;
+
+	if (argc != 5)
+	{
+		write(2, "pipex usage: infile command_1 command_2 outfile\n", 48);
 		return (1);
-	if (execute_cmd(argv[2], env))
-		return (perror("execute_cmd 1 problem"), 1);
-	if (execute_cmd(argv[3], env))
-		return (perror("execute_cmd 2 problem"), 1);
-	wait(NULL); // espera a que termine cualquiera de los dos procesos
-	wait(NULL);
-	return (0);
+	}
+	if (set_info(argv, argc, env, &info) == 1)
+		return (1);
+	if (pipe(info.pipe_end) == -1)
+	{
+		free_array(info.paths);
+		return (perror("problem creating pipe\n"), 1);
+	}
+	cmd = first_cmd(&info);
+	if (!cmd)
+		return (1);
+	if (second_cmd(&info, cmd) == 1)
+		return (1);
+	waitpid(info.pid1, NULL, 0);
+	waitpid(info.pid2, &exit_status, 0);
+	last_free(cmd, info.paths);
+	return (WEXITSTATUS(exit_status));
 }

@@ -1,6 +1,6 @@
 NAME = pipex
 
-SRCS = pipex.c new_split.c
+SRCS = pipex.c cmd_utils.c free_msg_utils.c extra_cmd_utils.c
 
 OBJS = $(SRCS:.c=.o) #todos archivos que se llaman igual que los .c pero terminados en .o (aun no creados)
 
@@ -14,13 +14,13 @@ LIBFT = libft/libft.a
 
 #------------------------------------------------
 
-all: $(NAME)
+all: makeLibft $(NAME)
 
 $(NAME): $(OBJS) $(LIBFT)
-	$(CC) $(FLAGS) $^ -o $(NAME)
+	$(CC) $(FLAGS) $(OBJS) $(LIBFT) -o $(NAME)
 
-$(LIBFT):
-	make -C libft
+makeLibft:
+	make -C libft 
 
 %.o:%.c Makefile pipex.h
 	$(CC) $(FLAGS) -c $< -o $@
@@ -35,4 +35,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re makeLibft
